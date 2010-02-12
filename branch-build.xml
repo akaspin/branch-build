@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- ====================================================================== 
+     Clean build to specific git branch.
+     
+     If build branch is exists locally - it will be resetted to remote 
+     origin before build. If remote origin doesn't exist - it will be 
+     recreated locally. Anyway - branch will be cleaned before build.
+     This behaviour prevents any corruption and lots of commits.
+     
+     Building process runs to directory specified by ${build.dir} 
+     variable branch-build.properties file.
+     
+     After build all changes will be pushed to target branch in work 
+     repository.  
+     ====================================================================== -->
+<project name="branch-build" default="run" basedir=".">
+	<property file="branch-build.properties" />
+	<property name="dir.current" location="." />
+
+	<!-- Determine kind of git executable -->
+	<condition property="git.cmd" value="git.cmd" else="git">
+		<os family="windows" />
+	</condition>
+
+	<!-- Macro for git operationss -->
+	<macrodef name="git">
+		<attribute name="command" />
+		<attribute name="dir" default="" />
+		<element name="args" optional="true" />
+		<sequential>
+			<echo message="git @{command}" />
+			<exec executable="${git.cmd}" dir="@{dir}" failonerror="false">
+				<arg value="@{command}" />
+				<args />
+			</exec>
+		</sequential>
+	</macrodef>
+
+	<macrodef name="git-reset-branch"
+	          description="Delete local branch and pull remote branch">
+		<attribute name="branch" />
+		<attribute name="remote" default="origin" />
+		<attribute name="dir" default="" />
+		<sequential>
+			<git command="branch" dir="@{dir}">
+				<args>
+					<arg value="-D" />
+					<arg value="@{branch}" />
+				</args>
+			</git>
+			<git command="branch" dir="@{dir}">
+				<args>
+					<arg value="@{branch}" />
+					<arg value="@{remote}/@{branch}" />
+				</args>
+			</git>
+		</sequential>
+	</macrodef>
+
+	<!-- ================================= 
+         target: run
+         Run operations               
+         ================================= -->
+	<target name="run"
+	        depends="setup,prepare,build,deploy,cleanup"
+	        description="Run operations">
+
+	</target>
+
+	<!-- ================================= 
+         target: build
+         Call external ant project
+         ================================= -->
+	<target name="build" description="Call external builder">
+		<ant antfile="${build.builder}">
+			<property name="build.dir" value="${build.dir}" />
+		</ant>
+	</target>
+
+	<!-- ================================= 
+         target: deploy
+         Commit build branch work repository            
+         ================================= -->
+	<target name="deploy" description="Commit build branch">
+		<git command="add" dir="${build.dir}">
+			<args>
+				<arg value="." />
+			</args>
+		</git>
+		<git command="commit" dir="${build.dir}">
+			<args>
+				<arg value='-m' />
+				<arg value='"Update documentation"' />
+			</args>
+		</git>
+		<git command="push" dir="${build.dir}">
+			<args>
+				<arg value='${build.remote}' />
+				<arg value='${build.branch}' />
+			</args>
+		</git>
+	</target>
+
+	<!-- ================================= 
+         target: cleanup     
+         Delete build directory     
+         ================================= -->
+	<target name="cleanup" description="Delete build directory ">
+		<delete dir="${build.dir}" includeemptydirs="true" />
+	</target>
+
+	<!-- ================================= 
+         target: prepare
+         Prepare build directory.
+         ================================= -->
+	<target name="prepare" description="Prepare build directory">
+
+		<delete dir="${build.dir}" includeemptydirs="true" />
+		<mkdir dir="${build.dir}" />
+
+		<git command="clone" dir="${build.dir}">
+			<args>
+				<arg value="--no-hardlinks" />
+				<arg value="--no-checkout" />
+				<arg value="${dir.current}" />
+				<arg value="." />
+			</args>
+		</git>
+		<git-reset-branch dir="${build.dir}"
+		                  remote="${build.remote}"
+		                  branch="${build.branch}" />
+		<exec dir="${build.dir}"
+		      executable="${git.cmd}"
+		      outputproperty="git.branch.build">
+			<arg value="branch" />
+		</exec>
+		<condition property="build.branch.op"
+		           value="cleanup-build-branch"
+		           else="create-build-branch">
+			<contains string="${git.branch.build}"
+			          substring="${build.branch}" />
+		</condition>
+		<antcall target="${build.branch.op}" />
+	</target>
+
+	<target name="create-build-branch" description="Just create empty branch">
+		<git command="symbolic-ref" dir="${build.dir}">
+			<args>
+				<arg value="HEAD" />
+				<arg value="refs/heads/${build.branch}" />
+			</args>
+		</git>
+		<delete file="${build.dir}/.git/index" />
+		<git command="clean" dir="${build.dir}">
+			<args>
+				<arg value="-fdx" />
+			</args>
+		</git>
+	</target>
+
+	<target name="cleanup-build-branch" description="Cleanup build branch">
+		<git command="checkout" dir="${build.dir}">
+			<args>
+				<arg value="${build.branch}" />
+			</args>
+		</git>
+		<git command="rm" dir="${build.dir}">
+			<args>
+				<arg value="-r" />
+				<arg value="." />
+			</args>
+		</git>
+	</target>
+
+	<!-- ================================= 
+         target: setup
+         Checking and setup target branch.
+	     ================================= -->
+	<target name="setup" description="Initial setup">
+		<exec executable="${git.cmd}" outputproperty="git.branch">
+			<arg value="branch" />
+		</exec>
+		<condition property="build.branch.current">
+			<contains string="${git.branch}" substring="* ${build.branch}" />
+		</condition>
+		<!-- If build branch is current  -->
+		<fail message="Build branch is current. Try to change branch."
+		      if="build.branch.current" />
+		<git-reset-branch remote="${build.remote}" branch="${build.branch}" />
+	</target>
+</project>

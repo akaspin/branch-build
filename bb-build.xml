@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- ====================================================================== 
+     Buildfile what specified by ${build.builder} variable in 
+	 branch-build.properties file.
+	 
+	 ${build.dir} variable points to target build dir.
+	 
+	 Regardless of location of this buildfile ${basedir} variable will 
+	 be same as in the parent branch-build.xml.
+     ====================================================================== -->
+<project name="project" default="build">
+	<description>
+		Buildfile what specified by ${build.builder} variable in 
+		branch-build.properties file.
+    </description>
+
+	<!-- ================================= 
+         target: build              
+         ================================= -->
+	<target name="build" description="description">
+		<touch file="${build.dir}/testfile" />
+	</target>
+</project>
