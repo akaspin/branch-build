@@ -14,6 +14,12 @@ After build all changes will be pushed to target branch in work
 local repository. If your local work repository is clone of 
 remote - you need to push changes.
 
+Requirements
+============
+
+  - Ant
+  - Git. In Windows you must install it with "command promt" option.
+
 Usage
 =====
 
