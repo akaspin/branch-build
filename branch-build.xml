@@ -90,7 +90,7 @@
 		<git command="commit" dir="${build.dir}">
 			<args>
 				<arg value='-m' />
-				<arg value='"Update documentation"' />
+				<arg value='"${commit.message}"' />
 			</args>
 		</git>
 		<git command="push" dir="${build.dir}">
